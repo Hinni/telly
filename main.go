@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-//	"github.com/koron/go-ssdp"
+	"github.com/koron/go-ssdp"
 	"github.com/namsral/flag"
 	"github.com/tombowditch/telly-m3u-parser"
 	"io"
@@ -15,7 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	//"time"
+	"time"
 )
 
 var deviceXml string
@@ -34,7 +34,7 @@ var deviceAuth *string
 var friendlyName *string
 var tempPath *string
 var deviceUuid string
-//var noSsdp *bool
+var noSsdp *bool
 var udpxy *string
 
 type DiscoveryData struct {
@@ -78,7 +78,7 @@ func init() {
 	friendlyName = flag.String("friendlyname", "telly", "Useful if you are running two instances of telly and want to differentiate between them.")
 	tempPath = flag.String("temp", os.TempDir()+"/telly.m3u", "Where telly will temporarily store the downloaded playlist file.")
 	directMode = flag.Bool("direct", false, "Does not encode the stream URL and redirect to the correct one.")
-	//noSsdp = flag.Bool("nossdp", false, "Turn off SSDP")
+	noSsdp = flag.Bool("nossdp", false, "Turn off SSDP")
 	udpxy = flag.String("udpxy","","Base Adress for udpxy")
 	flag.Parse()
 }
@@ -174,38 +174,38 @@ func buildChannels(usedTracks []m3u.Track) []LineupItem {
 	return lineup
 }
 
-// func sendAlive(advertiser *ssdp.Advertiser) {
-// 	aliveTick := time.Tick(15 * time.Second)
-//
-// 	for {
-// 		select {
-// 		case <-aliveTick:
-// 			if err := advertiser.Alive(); err != nil {
-// 				log("error", err.Error())
-// 				os.Exit(1)
-// 			}
-// 		}
-// 	}
-// }
+func sendAlive(advertiser *ssdp.Advertiser) {
+	aliveTick := time.Tick(15 * time.Second)
 
-// func advertiseSSDP(deviceName string, deviceUUID string) (*ssdp.Advertiser, error) {
-// 	log("debug", "Advertising telly as "+deviceName+" ("+deviceUUID+")")
-//
-// 	adv, err := ssdp.Advertise(
-// 		"upnp:rootdevice",
-// 		"uuid:"+deviceUUID+"::upnp:rootdevice",
-// 		"http://"+*listenAddress+"/device.xml",
-// 		deviceName,
-// 		1800)
-//
-// 	if err != nil {
-// 		return nil, err
-// 	}
-//
-// 	go sendAlive(adv)
-//
-// 	return adv, nil
-// }
+	for {
+		select {
+		case <-aliveTick:
+			if err := advertiser.Alive(); err != nil {
+				log("error", err.Error())
+				os.Exit(1)
+			}
+		}
+	}
+}
+
+func advertiseSSDP(deviceName string, deviceUUID string) (*ssdp.Advertiser, error) {
+	log("debug", "Advertising telly as "+deviceName+" ("+deviceUUID+")")
+
+	adv, err := ssdp.Advertise(
+		"upnp:rootdevice",
+		"uuid:"+deviceUUID+"::upnp:rootdevice",
+		"http://"+*listenAddress+"/device.xml",
+		deviceName,
+		1800)
+
+	if err != nil {
+		return nil, err
+	}
+
+	go sendAlive(adv)
+
+	return adv, nil
+}
 
 func base64StreamHandler(w http.ResponseWriter, r *http.Request, base64StreamUrl string) {
 	decodedStreamURI, err := base64.StdEncoding.DecodeString(base64StreamUrl)
@@ -404,13 +404,13 @@ func main() {
 		log("warning", "You are listening on all interfaces but your base URL is localhost (meaning Plex will try and load localhost to access your streams) - is this intended?")
 	}
 
-	// if !*noSsdp {
-	// 	log("info", "advertising telly service on network")
-	// 	_, err2 := advertiseSSDP(*friendlyName, deviceUuid)
-	// 	if err2 != nil {
-	// 		log("warning", "telly cannot advertise over ssdp: "+err2.Error())
-	// 	}
-	// }
+	if !*noSsdp {
+		log("info", "advertising telly service on network")
+		_, err2 := advertiseSSDP(*friendlyName, deviceUuid)
+		if err2 != nil {
+			log("warning", "telly cannot advertise over ssdp: "+err2.Error())
+		}
+	}
 
 	log("info", "listening on "+*listenAddress)
 	if err := http.ListenAndServe(*listenAddress, logRequestHandler(h)); err != nil {
